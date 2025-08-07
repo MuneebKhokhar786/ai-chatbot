@@ -1,7 +1,6 @@
 import { streamText, UIMessage, tool, convertToModelMessages, hasToolCall, stepCountIs } from 'ai';
 import { z } from 'zod';
 import Exa from 'exa-js';
-import { time } from 'console';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
