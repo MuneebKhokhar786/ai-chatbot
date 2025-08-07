@@ -1,7 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
-
+import React, { useEffect, useState } from 'react';
 import {
   Conversation,
   ConversationContent,
@@ -21,7 +20,6 @@ import {
   PromptInputToolbar,
   PromptInputTools,
 } from '@/components/ai-elements/prompt-input';
-import { useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { Response } from '@/components/ai-elements/response';
 import { GlobeIcon } from 'lucide-react';
@@ -39,20 +37,15 @@ import {
 import { Loader } from '@/components/ai-elements/loader';
 
 const models = [
-  {
-    name: 'GPT 4o',
-    value: 'openai/gpt-4o',
-  },
-  {
-    name: 'Deepseek R1',
-    value: 'deepseek/deepseek-r1',
-  },
+  { name: 'GPT 4o', value: 'openai/gpt-4o' },
+  { name: 'Deepseek R1', value: 'deepseek/deepseek-r1' },
 ];
 
 const ChatBotDemo = () => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
+  const [isWebSearching, setIsWebSearching] = useState(false);
   const { messages, sendMessage, status } = useChat();
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,25 +64,44 @@ const ChatBotDemo = () => {
     }
   };
 
+  const isToolStep = (message: any) => {
+    return (
+      message.role === 'assistant' &&
+      message.parts.every((part: any) =>
+        part.type.startsWith('tool-') || part.type === 'step-start')
+    );
+  };
+
+
+  useEffect(() => {
+    if (status === 'ready') {
+      setIsWebSearching(false);
+      return;
+    }
+    const lastMessage = messages[messages.length - 1];
+    const searching = lastMessage?.parts.some((part: any) => part.type === 'tool-webSearchTool');
+    setIsWebSearching(!!searching);
+
+  }, [status, messages]);
+
   return (
     <div className="max-w-4xl mx-auto p-6 relative size-full h-screen">
       <div className="flex flex-col h-full">
         <Conversation className="h-full">
           <ConversationContent>
-            {messages.map((message) => (
-              <div key={message.id}>
-                {message.role === 'assistant' && (
-                  <Sources>
-                    {message.parts.map((part, i) => {
-                      switch (part.type) {
-                        case 'source-url':
+            {messages.map((message) => {
+              if (isToolStep(message)) return null;
+              return (
+                <div key={message.id}>
+                  {message.role === 'assistant' && (
+                    <Sources>
+                      {message.parts.map((part, i) => {
+                        if (part.type === 'source-url') {
                           return (
                             <React.Fragment key={`source-url-${message.id}-${i}`}>
                               <SourcesTrigger
                                 count={
-                                  message.parts.filter(
-                                    (part) => part.type === 'source-url',
-                                  ).length
+                                  message.parts.filter((p) => p.type === 'source-url').length
                                 }
                               />
                               <SourcesContent key={`sources-content-${message.id}-${i}`}>
@@ -101,40 +113,43 @@ const ChatBotDemo = () => {
                               </SourcesContent>
                             </React.Fragment>
                           );
-                      }
-                    })}
-                  </Sources>
-                )}
-                <Message from={message.role} key={message.id}>
-                  <MessageContent>
-                    {message.parts.map((part, i) => {
-                      switch (part.type) {
-                        case 'text':
-                          return (
-                            <Response key={`${message.id}-${i}`}>
-                              {part.text}
-                            </Response>
-                          );
-                        case 'reasoning':
-                          return (
-                            <Reasoning
-                              key={`${message.id}-${i}`}
-                              className="w-full"
-                              isStreaming={status === 'streaming'}
-                            >
-                              <ReasoningTrigger />
-                              <ReasoningContent>{part.text}</ReasoningContent>
-                            </Reasoning>
-                          );
-                        default:
-                          return null;
-                      }
-                    })}
-                  </MessageContent>
-                </Message>
-              </div>
-            ))}
-            {status === 'submitted' && <Loader />}
+                        }
+                        return null;
+                      })}
+                    </Sources>
+                  )}
+
+                  <Message from={message.role} key={message.id}>
+                    <MessageContent>
+                      {message.parts.map((part, i) => {
+                        switch (part.type) {
+                          case 'text':
+                            return (
+                              <Response key={`${message.id}-${i}`}>{part.text}</Response>
+                            );
+                          case 'reasoning':
+                            return (
+                              <Reasoning
+                                key={`${message.id}-${i}`}
+                                className="w-full"
+                                isStreaming={status === 'streaming'}
+                              >
+                                <ReasoningTrigger />
+                                <ReasoningContent>{part.text}</ReasoningContent>
+                              </Reasoning>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </MessageContent>
+                  </Message>
+                </div>
+              );
+            })}
+            {(status === 'submitted' || isWebSearching) && (
+              <Loader />
+            )}
           </ConversationContent>
           <ConversationScrollButton />
         </Conversation>
@@ -154,9 +169,7 @@ const ChatBotDemo = () => {
                 <span>Search</span>
               </PromptInputButton>
               <PromptInputModelSelect
-                onValueChange={(value) => {
-                  setModel(value);
-                }}
+                onValueChange={(value) => setModel(value)}
                 value={model}
               >
                 <PromptInputModelSelectTrigger>
@@ -164,7 +177,10 @@ const ChatBotDemo = () => {
                 </PromptInputModelSelectTrigger>
                 <PromptInputModelSelectContent>
                   {models.map((model) => (
-                    <PromptInputModelSelectItem key={model.value} value={model.value}>
+                    <PromptInputModelSelectItem
+                      key={model.value}
+                      value={model.value}
+                    >
                       {model.name}
                     </PromptInputModelSelectItem>
                   ))}

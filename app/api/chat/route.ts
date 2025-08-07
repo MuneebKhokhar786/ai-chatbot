@@ -1,6 +1,7 @@
-import { streamText, UIMessage, tool, convertToModelMessages, stepCountIs } from 'ai';
+import { streamText, UIMessage, tool, convertToModelMessages, hasToolCall, stepCountIs } from 'ai';
 import { z } from 'zod';
 import Exa from 'exa-js';
+import { time } from 'console';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
@@ -17,7 +18,6 @@ export const webSearchTool = tool({
       livecrawl: 'always',
       numResults: 3,
     });
-    console.log('Web search results:', results);
     return results.map(result => ({
       title: result.title,
       url: result.url,
@@ -42,9 +42,10 @@ export async function POST(req: Request) {
     system:
       'You are a helpful assistant that can answer questions and help with tasks',
     tools: webSearch ? { webSearchTool } : {},
-    stopWhen: stepCountIs(5),
+    stopWhen: [hasToolCall('tool-webSearchTool'), stepCountIs(3)],
 
   });
+  console.log('Streaming response:', result);
   return result.toUIMessageStreamResponse({
     sendSources: true,
     sendReasoning: true,
