@@ -1,5 +1,7 @@
 'use client';
 
+import React from 'react';
+
 import {
   Conversation,
   ConversationContent,
@@ -82,7 +84,7 @@ const ChatBotDemo = () => {
                       switch (part.type) {
                         case 'source-url':
                           return (
-                            <>
+                            <React.Fragment key={`source-url-${message.id}-${i}`}>
                               <SourcesTrigger
                                 count={
                                   message.parts.filter(
@@ -90,14 +92,14 @@ const ChatBotDemo = () => {
                                   ).length
                                 }
                               />
-                              <SourcesContent key={`${message.id}-${i}`}>
+                              <SourcesContent key={`sources-content-${message.id}-${i}`}>
                                 <Source
-                                  key={`${message.id}-${i}`}
+                                  key={`source-${message.id}-${i}`}
                                   href={part.url}
                                   title={part.url}
                                 />
                               </SourcesContent>
-                            </>
+                            </React.Fragment>
                           );
                       }
                     })}
