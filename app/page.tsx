@@ -49,11 +49,23 @@ const ChatBotDemo = () => {
 
   const { messages, sendMessage, status } = useChat();
 
+  type MessagePart = {
+    type: string;
+    text?: string;
+    url?: string;
+  };
+
+  type Message = {
+    id: string;
+    role: string;
+    parts: MessagePart[];
+  };
+
   const isToolStep = useCallback(
-    (message: any) =>
+    (message: Message) =>
       message.role === "assistant" &&
       message.parts.every(
-        (part: any) =>
+        (part) =>
           part.type.startsWith("tool-") || part.type === "step-start"
       ),
     []
@@ -83,9 +95,9 @@ const ChatBotDemo = () => {
       return;
     }
 
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages[messages.length - 1] as Message | undefined;
     const searching = lastMessage?.parts.some(
-      (part: any) => part.type === "tool-webSearchTool"
+      (part) => part.type === "tool-webSearchTool"
     );
 
     setIsWebSearching(Boolean(searching));

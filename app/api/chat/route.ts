@@ -5,9 +5,9 @@ import Exa from 'exa-js';
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
-export const exa = new Exa(process.env.EXA_API_KEY);
+const exa = new Exa(process.env.EXA_API_KEY);
 
-export const webSearchTool = tool({
+const webSearchTool = tool({
   description: 'Search the web for up-to-date information',
   inputSchema: z.object({
     query: z.string().min(1).max(100).describe('The search query'),
