@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Conversation,
   ConversationContent,
   ConversationScrollButton,
-} from '@/components/ai-elements/conversation';
-import { Message, MessageContent } from '@/components/ai-elements/message';
+} from "@/components/ai-elements/conversation";
+import { Message, MessageContent } from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputButton,
@@ -19,70 +19,87 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputTools,
-} from '@/components/ai-elements/prompt-input';
-import { useChat } from '@ai-sdk/react';
-import { Response } from '@/components/ai-elements/response';
-import { GlobeIcon } from 'lucide-react';
+} from "@/components/ai-elements/prompt-input";
+import { useChat } from "@ai-sdk/react";
+import { Response } from "@/components/ai-elements/response";
+import { GlobeIcon } from "lucide-react";
 import {
   Source,
   Sources,
   SourcesContent,
   SourcesTrigger,
-} from '@/components/ai-elements/source';
+} from "@/components/ai-elements/source";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from '@/components/ai-elements/reasoning';
-import { Loader } from '@/components/ai-elements/loader';
+} from "@/components/ai-elements/reasoning";
+import { Loader } from "@/components/ai-elements/loader";
 
-const models = [
-  { name: 'GPT 4o', value: 'openai/gpt-4o' },
-  { name: 'Deepseek R1', value: 'deepseek/deepseek-r1' },
+const MODELS = [
+  { name: "GPT 4o", value: "openai/gpt-4o" },
+  { name: "Deepseek R1", value: "deepseek/deepseek-r1" },
 ];
 
 const ChatBotDemo = () => {
-  const [input, setInput] = useState('');
-  const [model, setModel] = useState<string>(models[0].value);
+  const [input, setInput] = useState("");
+  const [model, setModel] = useState<string>(MODELS[0].value);
   const [webSearch, setWebSearch] = useState(false);
   const [isWebSearching, setIsWebSearching] = useState(false);
+
   const { messages, sendMessage, status } = useChat();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim()) {
+  const isToolStep = useCallback(
+    (message: any) =>
+      message.role === "assistant" &&
+      message.parts.every(
+        (part: any) =>
+          part.type.startsWith("tool-") || part.type === "step-start"
+      ),
+    []
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!input.trim()) return;
+
       sendMessage(
         { text: input },
         {
-          body: {
-            model: model,
-            webSearch: webSearch,
-          },
-        },
+          body: { model, webSearch },
+        }
       );
-      setInput('');
-    }
-  };
 
-  const isToolStep = (message: any) => {
-    return (
-      message.role === 'assistant' &&
-      message.parts.every((part: any) =>
-        part.type.startsWith('tool-') || part.type === 'step-start')
-    );
-  };
+      setInput("");
+    },
+    [input, model, webSearch, sendMessage]
+  );
 
 
   useEffect(() => {
-    if (status === 'ready') {
+    if (status === "ready") {
       setIsWebSearching(false);
       return;
     }
-    const lastMessage = messages[messages.length - 1];
-    const searching = lastMessage?.parts.some((part: any) => part.type === 'tool-webSearchTool');
-    setIsWebSearching(!!searching);
 
+    const lastMessage = messages[messages.length - 1];
+    const searching = lastMessage?.parts.some(
+      (part: any) => part.type === "tool-webSearchTool"
+    );
+
+    setIsWebSearching(Boolean(searching));
   }, [status, messages]);
+
+  const modelOptions = useMemo(
+    () =>
+      MODELS.map(({ name, value }) => (
+        <PromptInputModelSelectItem key={value} value={value}>
+          {name}
+        </PromptInputModelSelectItem>
+      )),
+    []
+  );
 
   return (
     <div className="max-w-4xl mx-auto p-6 relative size-full h-screen">
@@ -91,66 +108,59 @@ const ChatBotDemo = () => {
           <ConversationContent>
             {messages.map((message) => {
               if (isToolStep(message)) return null;
+
               return (
                 <div key={message.id}>
-                  {message.role === 'assistant' && (
+                  {message.role === "assistant" && (
                     <Sources>
-                      {message.parts.map((part, i) => {
-                        if (part.type === 'source-url') {
-                          return (
-                            <React.Fragment key={`source-url-${message.id}-${i}`}>
-                              <SourcesTrigger
-                                count={
-                                  message.parts.filter((p) => p.type === 'source-url').length
-                                }
-                              />
-                              <SourcesContent key={`sources-content-${message.id}-${i}`}>
-                                <Source
-                                  key={`source-${message.id}-${i}`}
-                                  href={part.url}
-                                  title={part.url}
-                                />
-                              </SourcesContent>
-                            </React.Fragment>
-                          );
-                        }
-                        return null;
-                      })}
+                      {message.parts
+                        .filter((part) => part.type === "source-url")
+                        .map((part, i, sourceParts) => (
+                          <React.Fragment key={`source-${message.id}-${i}`}>
+                            {i === 0 && (
+                              <SourcesTrigger count={sourceParts.length} />
+                            )}
+                            <SourcesContent>
+                              <Source href={part.url} title={part.url} />
+                            </SourcesContent>
+                          </React.Fragment>
+                        ))}
                     </Sources>
                   )}
 
-                  <Message from={message.role} key={message.id}>
+                  <Message from={message.role}>
                     <MessageContent>
                       {message.parts.map((part, i) => {
-                        switch (part.type) {
-                          case 'text':
-                            return (
-                              <Response key={`${message.id}-${i}`}>{part.text}</Response>
-                            );
-                          case 'reasoning':
-                            return (
-                              <Reasoning
-                                key={`${message.id}-${i}`}
-                                className="w-full"
-                                isStreaming={status === 'streaming'}
-                              >
-                                <ReasoningTrigger />
-                                <ReasoningContent>{part.text}</ReasoningContent>
-                              </Reasoning>
-                            );
-                          default:
-                            return null;
+                        if (part.type === "text") {
+                          return (
+                            <Response key={`${message.id}-${i}`}>
+                              {part.text}
+                            </Response>
+                          );
                         }
+                        if (part.type === "reasoning") {
+                          return (
+                            <Reasoning
+                              key={`${message.id}-${i}`}
+                              className="w-full"
+                              isStreaming={status === "streaming"}
+                            >
+                              <ReasoningTrigger />
+                              <ReasoningContent>{part.text}</ReasoningContent>
+                            </Reasoning>
+                          );
+                        }
+                        return null;
                       })}
                     </MessageContent>
                   </Message>
                 </div>
               );
             })}
-            {(status === 'submitted' || isWebSearching) && (
-              <Loader />
-            )}
+
+            {(status === "submitted" || isWebSearching) && <Loader />}
           </ConversationContent>
+
           <ConversationScrollButton />
         </Conversation>
 
@@ -162,31 +172,26 @@ const ChatBotDemo = () => {
           <PromptInputToolbar>
             <PromptInputTools>
               <PromptInputButton
-                variant={webSearch ? 'default' : 'ghost'}
-                onClick={() => setWebSearch(!webSearch)}
+                variant={webSearch ? "default" : "ghost"}
+                onClick={() => setWebSearch((prev) => !prev)}
               >
                 <GlobeIcon size={16} />
                 <span>Search</span>
               </PromptInputButton>
+
               <PromptInputModelSelect
-                onValueChange={(value) => setModel(value)}
+                onValueChange={setModel}
                 value={model}
               >
                 <PromptInputModelSelectTrigger>
                   <PromptInputModelSelectValue />
                 </PromptInputModelSelectTrigger>
                 <PromptInputModelSelectContent>
-                  {models.map((model) => (
-                    <PromptInputModelSelectItem
-                      key={model.value}
-                      value={model.value}
-                    >
-                      {model.name}
-                    </PromptInputModelSelectItem>
-                  ))}
+                  {modelOptions}
                 </PromptInputModelSelectContent>
               </PromptInputModelSelect>
             </PromptInputTools>
+
             <PromptInputSubmit disabled={!input} status={status} />
           </PromptInputToolbar>
         </PromptInput>
